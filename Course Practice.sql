@@ -237,15 +237,158 @@ FROM
 	salaries
 WHERE (emp_no BETWEEN 10500 AND 10600)  AND (salary > 80000)
 WINDOW w AS (PARTITION BY emp_no ORDER BY salary DESC);
+-- ---------------------------------------------------------------------------------
+# Create a query that upon execution returns a result set containing the employee numbers,
+# contract salary values, start, and end dates of the first ever contracts that each employee
+# signed for the company.
 
+# To obtain the desired output, refer to the data stored in the "salaries" table.
 
+SELECT s2.emp_no, s1.salary, s1.from_date, s1.to_date
+FROM 
+	salaries s1
+		JOIN
+	(SELECT emp_no, MIN(from_date) AS min_from_date FROM salaries GROUP BY emp_no) s2 ON s2.emp_no = s1.emp_no
+WHERE s1.from_date = s2.min_from_date;
+-- -----------------------------------------------------------------------------------
+SELECT q1.emp_no, d.dept_name , q2.from_date, q2.to_date, q2.salary AS current_salary, AVG(q2.salary) OVER (PARTITION BY q1.dept_no) AS average_salary_per_department
+FROM 
+		(SELECT de1.emp_no, de1.dept_no, de1.from_date, de1.to_date
+		 FROM dept_emp de1
+				JOIN
+			(SELECT de.emp_no, MAX(de.from_date) AS from_date
+			 FROM dept_emp de
+             WHERE de.to_date > SYSDATE()
+             GROUP BY de.emp_no) de2 
+				ON 
+             de1.emp_no = de2.emp_no AND de1.from_date = de2.from_date) q1
+				JOIN
+		(SELECT s1.emp_no, s1.salary, s1.from_date, s1.to_date
+		 FROM salaries s1
+				JOIN
+			(SELECT s.emp_no, s.salary, MAX(s.from_date) as from_date, s.to_date
+			 FROM salaries s
+             WHERE s.to_date > SYSDATE()
+			 GROUP BY s.emp_no) s2 
+				ON
+             s1.emp_no = s2.emp_no AND s1.from_date = s2.from_date) q2 
+				ON 
+             q1.emp_no = q2.emp_no
+				JOIN
+					departments d 
+				ON 
+					q1.dept_no = d.dept_no
+ORDER BY q1.emp_no;
+-- GPT Version -----------------
+SELECT 
+    q1.emp_no, 
+    d.dept_name,q2.from_date, q2.to_date, 
+    q2.salary AS current_salary, 
+    AVG(q2.salary) OVER (PARTITION BY q1.dept_no) AS average_salary_per_department
+FROM 
+    (SELECT 
+         de1.emp_no, 
+         de1.dept_no 
+     FROM 
+         dept_emp de1
+     JOIN 
+         (SELECT 
+              emp_no, MAX(from_date) AS from_date 
+          FROM 
+              dept_emp 
+          WHERE 
+              to_date > SYSDATE() 
+          GROUP BY 
+              emp_no) de2 
+     ON 
+         de1.emp_no = de2.emp_no AND de1.from_date = de2.from_date) q1
+JOIN 
+    (SELECT 
+         s1.emp_no, 
+         s1.salary,
+         s1.from_date,
+         s1.to_date
+     FROM 
+         salaries s1
+     JOIN 
+         (SELECT 
+              emp_no, MAX(from_date) AS from_date 
+          FROM 
+              salaries 
+          WHERE 
+              to_date > SYSDATE() 
+          GROUP BY 
+              emp_no) s2 
+     ON 
+         s1.emp_no = s2.emp_no AND s1.from_date = s2.from_date) q2 
+ON 
+    q1.emp_no = q2.emp_no
+JOIN 
+    departments d 
+ON 
+    q1.dept_no = d.dept_no
+ORDER BY 
+    q1.emp_no;
 
-
-
-
-
-
-
-
-
-
+-- -----------------------------------------------------------------------------------
+/* 
+	contract after 1-1-2000 and terminated before 1-1-2002 (dept_emp Table)
+    emp_no
+    salary of the latest contract in this period
+    department
+    average salary paid in this department in this period
+*/
+SELECT 
+	de.emp_no,
+    d.dept_name,
+    s.salary,
+    AVG(s.salary) OVER W AS average_salary_per_department,
+    s.to_date,
+    s.from_date
+FROM 
+	salaries s
+		JOIN
+	dept_emp de ON de.emp_no = s.emp_no
+		JOIN
+	departments d ON d.dept_no = de.dept_no
+		JOIN
+	(SELECT
+		emp_no,
+        MAX(to_date) AS to_date
+	 FROM salaries
+     WHERE (to_date < '2000-1-1') AND (from_date > '2002-1-1')
+     GROUP BY emp_no) s1 ON s1.emp_no = s.emp_no
+WINDOW W AS (PARTITION BY de.dept_no);
+-- ---------------------------------------------------------------------------------
+SELECT de2.emp_no, d.dept_name, s2.salary, AVG(s2.salary) OVER w AS average_salary_per_department
+FROM
+						(SELECT de.emp_no, de.dept_no, de.from_date, de.to_date
+						FROM dept_emp de
+								JOIN
+							(SELECT emp_no, MAX(from_date) AS from_date
+							FROM dept_emp
+							WHERE from_date > '2000-01-01' AND to_date < '2002-01-01'
+							GROUP BY emp_no) de1 ON de.emp_no = de1.emp_no AND de.from_date = de1.from_date
+						ORDER BY de.emp_no, de.dept_no) de2
+                    
+	JOIN
+    
+							(SELECT s1.emp_no, s.salary, s.from_date, s.to_date
+							 FROM salaries s 
+									JOIN
+								(SELECT emp_no, MAX(from_date) AS from_date 
+								 FROM salaries 	
+								 GROUP BY emp_no) s1 ON s.emp_no = s1.emp_no
+							     WHERE 
+										s.to_date < '2002-01-01' 
+									AND s.from_date > '2000-01-01'
+									AND s.from_date = s1.from_date) s2 ON s2.emp_no = de2.emp_no
+                                
+			JOIN
+            
+						departments d ON d.dept_no = de2.dept_no
+                        
+GROUP BY de2.emp_no, d.dept_name
+WINDOW w AS (PARTITION BY de2.dept_no)
+ORDER BY de2.emp_no, salary;
+-- ---------------------------------------------------------------------------------------------------
