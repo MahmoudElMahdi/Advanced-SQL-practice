@@ -392,3 +392,155 @@ GROUP BY de2.emp_no, d.dept_name
 WINDOW w AS (PARTITION BY de2.dept_no)
 ORDER BY de2.emp_no, salary;
 -- ---------------------------------------------------------------------------------------------------
+/*
+Use a CTE (a Common Table Expression) and a SUM() function in the SELECT statement
+in a query to find out how many male employees have never signed a contract with a
+salary value higher than or equal to the all-time company salary average.
+*/
+WITH CTE AS (SELECT AVG(salary) AS avg_salary FROM salaries) 
+SELECT SUM(CASE WHEN s.salary < c.avg_salary THEN 1 ELSE 0 END) AS no_salaries_below_avg, COUNT(s.emp_no) AS no_of_salary_contracts
+FROM salaries s
+	JOIN
+    employees e ON e.emp_no = s.emp_no AND e.gender = 'm'
+	JOIN CTE c;
+
+
+-- 365 Solution
+WITH cte AS (
+
+SELECT AVG(salary) AS avg_salary FROM salaries
+
+)
+
+SELECT
+
+SUM(CASE WHEN s.salary < c.avg_salary THEN 1 ELSE 0 END) AS no_salaries_below_avg,
+
+COUNT(s.salary) AS no_of_salary_contracts
+
+FROM salaries s JOIN employees e ON s.emp_no = e.emp_no AND e.gender = 'M' JOIN cte c;
+-- ---------------------------------------------------------------------------------------
+/*
+Use a CTE (a Common Table Expression) and (at least one) COUNT() function in the
+SELECT statement of a query to find out how many male employees have never signed a
+contract with a salary value higher than or equal to the all-time company salary average.
+*/
+WITH CTE AS (SELECT AVG(salary) AS avg_salary FROM salaries) 
+SELECT COUNT(CASE WHEN s.salary < c.avg_salary THEN s.salary ELSE NULL END) AS no_salaries_below_avg, COUNT(s.emp_no) AS no_of_salary_contracts
+FROM salaries s
+	JOIN
+    employees e ON e.emp_no = s.emp_no AND e.gender = 'm'
+	CROSS JOIN CTE c;
+-- -------------------------------------------------------------------------------------------
+/*
+Use MySQL joins (and don't use a Common Table Expression) in a query to find out how
+many male employees have never signed a contract with a salary value higher than or
+equal to the all-time company salary average (i.e. to obtain the same result as in the
+previous exercise).
+*/
+SELECT COUNT(CASE WHEN s.salary < c.avg_salary THEN s.salary ELSE NULL END) AS no_salaries_below_avg, COUNT(s.emp_no) AS no_of_salary_contracts
+FROM salaries s
+	JOIN
+    employees e ON e.emp_no = s.emp_no AND e.gender = 'm'
+	CROSS JOIN
+    (SELECT AVG(salary) AS avg_salary FROM salaries) c;
+-- --------------------------------------------------------------------------------------------
+/*
+Use a cross join in a query to find out how many male employees have never signed a
+contract with a salary value higher than or equal to the all-time company salary average
+(i.e. to obtain the same result as in the previous exercise).
+*/
+WITH CTE AS (SELECT AVG(salary) AS avg_salary FROM salaries) 
+SELECT SUM(CASE WHEN s.salary < c.avg_salary THEN 1 ELSE 0 END) AS no_salaries_below_avg, COUNT(s.emp_no) AS no_of_salary_contracts
+FROM salaries s
+	JOIN
+    employees e ON e.emp_no = s.emp_no AND e.gender = 'm'
+	CROSS JOIN CTE c;
+/*
+Best Practice:
+
+When working with single-row CTEs:
+
+Prefer JOIN for clarity, readability, and potential performance gains. 
+Use CROSS JOIN only if you want to explicitly show that all combinations are required (e.g., multi-row scenarios).
+*/
+-- --------------------------------------------------------------------------------------------
+/*
+Use two common table expressions and a SUM() function in the SELECT statement of a
+query to obtain the number of male employees whose highest salaries have been below
+the all-time average.
+*/
+WITH 
+CTE1 AS (
+SELECT AVG(salary) AS avg_salary 
+FROM salaries
+),
+CTE2 AS (
+SELECT s.emp_no, MAX(s.salary) AS highest_salary 
+FROM salaries s 
+	JOIN employees e ON s.emp_no = e.emp_no AND e.gender = "M" 
+GROUP BY s.emp_no
+)
+SELECT SUM(CASE WHEN c2.highest_salary < c1.avg_salary THEN 1 ELSE 0 END) AS no_of_males_lower_than_avg,
+COUNT(e.emp_no) no_of_total_employees
+FROM employees e
+	JOIN
+	CTE2 c2 ON c2.emp_no = e.emp_no
+    CROSS JOIN 
+    CTE1 c1;
+-- --------------------------------------------------------------------------------------------------------    
+/*    
+Use two common table expressions and a COUNT() function in the SELECT statement of
+a query to obtain the number of male employees whose highest salaries have been below
+the all-time average.
+*/    
+WITH 
+CTE1 AS (
+SELECT AVG(salary) AS avg_salary 
+FROM salaries
+),
+CTE2 AS (
+SELECT s.emp_no, MAX(s.salary) AS highest_salary 
+FROM salaries s 
+	JOIN employees e ON s.emp_no = e.emp_no AND e.gender = "M" 
+GROUP BY s.emp_no
+)
+SELECT COUNT(CASE WHEN c2.highest_salary < c1.avg_salary THEN c2.highest_salary ELSE NULL END) AS no_of_males_lower_than_avg,
+COUNT(e.emp_no) no_of_total_employees
+FROM employees e
+	JOIN
+	CTE2 c2 ON c2.emp_no = e.emp_no
+    CROSS JOIN 
+    CTE1 c1;
+-- -----------------------------------------------------------------------------------------------
+/*
+Does the result from the previous exercise change if you used the Common Table
+Expression (CTE) for the male employees' highest salaries in a FROM clause, as opposed
+to in a join?
+*/
+WITH 
+CTE1 AS (
+SELECT AVG(salary) AS avg_salary 
+FROM salaries
+),
+CTE2 AS (
+SELECT s.emp_no, MAX(s.salary) AS highest_salary 
+FROM salaries s 
+	JOIN employees e ON s.emp_no = e.emp_no AND e.gender = "M" 
+GROUP BY s.emp_no
+)
+SELECT COUNT(CASE WHEN c2.highest_salary < c1.avg_salary THEN c2.highest_salary ELSE NULL END) AS no_of_males_lower_than_avg,
+COUNT(c2.emp_no) no_of_total_employees
+FROM CTE2 c2
+    CROSS JOIN 
+    CTE1 c1;
+-- ------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
