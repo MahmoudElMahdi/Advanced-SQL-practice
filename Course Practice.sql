@@ -535,11 +535,99 @@ FROM CTE2 c2
     CROSS JOIN 
     CTE1 c1;
 -- ------------------------------------------------------------------------------------------
+SELECT a.emp_no, a.salary as min_salary 
+FROM (SELECT emp_no, salary,ROW_NUMBER() OVER w AS row_num FROM salaries 
+WINDOW w AS (PARTITION BY emp_no ORDER BY salary)) a
+WHERE a.row_num = 2;
+
+
+SELECT s.salary, DENSE_RANK() OVER (PARTITION BY s.emp_no ORDER BY s.salary DESC) as rank_salary
+FROM salaries s
+WHERE s.emp_no = 10560;
+
+SELECT emp_no,
+ salary AS current_salary,
+ LAG(salary) OVER w AS salary_before_current,
+ LEAD(salary) OVER w AS salary_after_current,
+ (salary - LAG(salary) OVER w) AS diff_w_before,
+ (LEAD(salary) OVER w - salary) AS diff_w_after
+FROM salaries 
+WHERE emp_no = 110085
+WINDOW w AS (PARTITION BY emp_no ORDER BY salary ASC);
+
+
+WITH AllTimeAvg AS (
+    SELECT AVG(salary) AS avg_salary
+    FROM salaries
+),
+MaxSalaries AS (
+    SELECT 
+        s.emp_no,
+        MAX(s.salary) AS max_salary
+    FROM salaries s
+    JOIN dept_manager dm ON s.emp_no = dm.emp_no
+    WHERE dm.dept_no = 'd004'
+    GROUP BY s.emp_no
+)
+SELECT 
+    COUNT(ms.emp_no) AS production_mgrs_below_avg
+FROM MaxSalaries ms
+CROSS JOIN AllTimeAvg aa
+WHERE ms.max_salary < aa.avg_salary;
+-- -------------------------------------------------------
+USE albums;
+
+SELECT a.artist_id,
+MIN(release_date) AS earliest_date FROM (
+SELECT 
+	artist_id, release_date, ROW_NUMBER() OVER w AS row_num
+FROM
+	albums
+WINDOW w AS (PARTITION BY artist_id ORDER BY release_date)) a
+GROUP BY release_date;
+
+SELECT artist_first_name , 
+LAG(record_label_contract_start_date)  OVER W AS lagg, 
+LEAD(record_label_contract_start_date) OVER w AS leadd,
+datediff(record_label_contract_start_date , LAG(record_label_contract_start_date) OVER W) AS diff_w_lagg,
+datediff(LEAD(record_label_contract_start_date) OVER w , record_label_contract_start_date) AS diff_w_leadd
+FROM artists 
+WINDOW w AS (PARTITION BY artist_id);
+
+WITH CTE1 AS (SELECT AVG(no_weeks_top_100) AS avg_t100 FROM artists)
+SELECT a.artist_id, SUM(CASE WHEN a.no_weeks_top_100 < c1.avg_t100 THEN 1 ELSE 0 END) as sm
+FROM artists a 
+JOIN CTE1 c1;
+
+select start_date_ind_artist
+from artists;
+
+SELECT AVG(no_weeks_top_100) AS avg_t100 FROM artists;
 
 
 
+SELECT
+artist_first_name,
+artist_last_name,
+record_label_contract_start_date,
+LAG(record_label_contract_start_date) OVER w AS record_label_sd_before_current,
+LEAD(record_label_contract_start_date) OVER w AS record_label_sd_after_current,
+DATEDIFF(record_label_contract_start_date, LAG(record_label_contract_start_date) OVER w) AS diff_record_label_sd_before_current,
+DATEDIFF(LEAD(record_label_contract_start_date) OVER w, record_label_contract_start_date) AS diff_record_label_sd_after_current
+FROM
+artists
+WHERE start_date_ind_artist IS NULL
+WINDOW W AS (ORDER BY record_label_contract_start_date);
 
-
+SELECT artist_first_name, 
+artist_last_name,
+record_label_contract_start_date,
+LAG(record_label_contract_start_date) OVER W AS lagg, 
+LEAD(record_label_contract_start_date) OVER w AS leadd,
+datediff(record_label_contract_start_date , LAG(record_label_contract_start_date) OVER W) AS diff_w_lagg,
+datediff(LEAD(record_label_contract_start_date) OVER w , record_label_contract_start_date) AS diff_w_leadd
+FROM artists 
+WINDOW w AS (ORDER BY record_label_contract_start_date);
 
 
 
